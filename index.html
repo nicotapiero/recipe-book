@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Recipes</title>
+
+  <style>
+    body {
+      max-width: 760px;
+      margin: 50px auto;
+      padding: 0 20px;
+      font-family: Georgia, serif;
+      line-height: 1.6;
+      color: #222;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      margin: 0;
+    }
+
+    .recipe-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .recipe-list li {
+      margin-bottom: 28px;
+    }
+
+    .recipe-list a {
+      font-size: 1.25rem;
+      text-decoration: none;
+    }
+
+    .recipe-list a:hover {
+      text-decoration: underline;
+    }
+
+    .recipe-source {
+      display: block;
+      color: #777;
+      font-size: 0.9rem;
+    }
+
+    .recipe-tags {
+      color: #777;
+      font-size: 0.85rem;
+    }
+
+    .recipe {
+      display: none;
+    }
+
+    .recipe h1 {
+      margin-bottom: 5px;
+    }
+
+    .source {
+      color: #777;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .tags {
+      margin-bottom: 30px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-right: 10px;
+      color: #777;
+      font-size: 0.9rem;
+    }
+
+    .recipe-image {
+      width: 100%;
+      max-height: 500px;
+      object-fit: cover;
+      margin-bottom: 30px;
+    }
+
+    section {
+      margin-bottom: 35px;
+    }
+
+    li {
+      margin-bottom: 10px;
+    }
+
+    .steps li {
+      margin-bottom: 18px;
+    }
+
+    .back {
+      display: inline-block;
+      margin-bottom: 30px;
+      color: #777;
+      font-size: 0.9rem;
+    }
+
+    .error {
+      color: #900;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1><a href="./">Recipes</a></h1>
+  </header>
+
+  <main>
+
+    <!-- Recipe list -->
+    <div id="recipeList">
+      <p>Loading...</p>
+    </div>
+
+    <!-- Individual recipe -->
+    <article id="recipe" class="recipe">
+      <a class="back" href="./">← All recipes</a>
+
+      <h1 id="recipeName"></h1>
+
+      <div id="recipeSource" class="source"></div>
+
+      <div id="recipeTags" class="tags"></div>
+
+      <img
+        id="recipeImage"
+        class="recipe-image"
+        alt=""
+      >
+
+      <section>
+        <h2>Ingredients</h2>
+        <ul id="ingredients"></ul>
+      </section>
+
+      <section>
+        <h2>Steps</h2>
+        <ol id="steps" class="steps"></ol>
+      </section>
+    </article>
+
+  </main>
+
+  <script>
+    const sheetId = "1YbGeolRFimdm7JHYQXe57nh9llJZL0I4jCUniD5wn2M";
+
+    const params = new URLSearchParams(window.location.search);
+    const recipeId = params.get("id");
+
+    const url =
+      `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+
+    fetch(url)
+      .then(response => response.text())
+      .then(text => {
+        const json = JSON.parse(text.substring(47).slice(0, -2));
+        render(json.table);
+      })
+      .catch(error => {
+        console.error(error);
+        document.getElementById("recipeList").innerHTML =
+          '<p class="error">Could not load recipes.</p>';
+      });
+
+
+    function render(table) {
+      const headers = table.rows[0].c.map(cell => {
+        return cell ? String(cell.v).trim().toLowerCase() : "";
+      });
+
+      const recipes = table.rows
+        .slice(1)
+        .map(row => {
+          const recipe = {};
+
+          headers.forEach((header, index) => {
+            const cell = row.c[index];
+            recipe[header] = cell ? cell.v : "";
+          });
+
+          return recipe;
+        })
+        .filter(recipe => recipe.name);
+
+
+      if (recipeId) {
+        renderRecipe(recipes, recipeId);
+      } else {
+        renderList(recipes);
+      }
+    }
+
+
+    function renderList(recipes) {
+      document.getElementById("recipe").style.display = "none";
+
+      const list = document.createElement("ul");
+      list.className = "recipe-list";
+
+      recipes.forEach((recipe, index) => {
+        const li = document.createElement("li");
+
+        /*
+         * Use the spreadsheet row number as the ID.
+         * Row 1 is the header, so the first recipe is row 2.
+         */
+        const rowNumber = index + 2;
+
+        const link = document.createElement("a");
+        link.href = `?id=${rowNumber}`;
+        link.textContent = recipe.name;
+
+        li.appendChild(link);
+
+        if (recipe.source) {
+          const source = document.createElement("span");
+          source.className = "recipe-source";
+          source.textContent = recipe.source;
+          li.appendChild(source);
+        }
+
+        if (recipe.tags) {
+          const tags = document.createElement("span");
+          tags.className = "recipe-tags";
+          tags.textContent = recipe.tags;
+          li.appendChild(tags);
+        }
+
+        list.appendChild(li);
+      });
+
+      const container = document.getElementById("recipeList");
+      container.innerHTML = "";
+      container.appendChild(list);
+    }
+
+
+    function renderRecipe(recipes, id) {
+      const index = parseInt(id, 10) - 2;
+      const recipe = recipes[index];
+
+      if (!recipe) {
+        document.getElementById("recipeList").innerHTML =
+          '<p class="error">Recipe not found.</p>';
+        return;
+      }
+
+      document.getElementById("recipeList").style.display = "none";
+      document.getElementById("recipe").style.display = "block";
+
+      document.title = recipe.name;
+
+      document.getElementById("recipeName").textContent =
+        recipe.name;
+
+
+      // Source
+
+      const sourceElement = document.getElementById("recipeSource");
+      sourceElement.innerHTML = "";
+
+      if (recipe.source) {
+        /*
+         * If your source column contains a URL, make it clickable.
+         * Otherwise just display the text.
+         */
+        if (recipe.source.startsWith("http")) {
+          const link = document.createElement("a");
+          link.href = recipe.source;
+          link.textContent = "Source";
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          sourceElement.appendChild(link);
+        } else {
+          sourceElement.textContent = recipe.source;
+        }
+      }
+
+
+      // Tags
+
+      const tagsElement = document.getElementById("recipeTags");
+      tagsElement.innerHTML = "";
+
+      if (recipe.tags) {
+        recipe.tags
+          .split(",")
+          .map(tag => tag.trim())
+          .filter(Boolean)
+          .forEach(tag => {
+            const span = document.createElement("span");
+            span.className = "tag";
+            span.textContent = tag;
+            tagsElement.appendChild(span);
+          });
+      }
+
+
+      // Image
+
+      const image = document.getElementById("recipeImage");
+
+      if (recipe.image) {
+        image.src = recipe.image;
+        image.alt = recipe.name;
+        image.style.display = "block";
+      } else {
+        image.removeAttribute("src");
+        image.style.display = "none";
+      }
+
+
+      // Ingredients
+
+      const ingredients = document.getElementById("ingredients");
+      ingredients.innerHTML = "";
+
+      recipe.ingredients
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .forEach(ingredient => {
+          const li = document.createElement("li");
+          li.textContent = ingredient;
+          ingredients.appendChild(li);
+        });
+
+
+      // Steps
+
+      const steps = document.getElementById("steps");
+      steps.innerHTML = "";
+
+      recipe.steps
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .forEach(step => {
+          const li = document.createElement("li");
+          li.textContent = step;
+          steps.appendChild(li);
+        });
+    }
+  </script>
+
+</body>
+</html>
